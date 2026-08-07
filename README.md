@@ -9,10 +9,11 @@ Research code for a power-transmission inspection prototype combining:
 
 ## Repository scope
 
-This repository contains source code, configuration files, aggregate evaluation
-results, and the manuscript draft. It does **not** contain inspection images,
-third-party datasets, trained model weights, API keys, or the local user
-database. Dataset access remains subject to the terms of each upstream source.
+This repository contains source code, configuration files, and aggregate
+evaluation results. It does **not** contain the unpublished manuscript,
+inspection images, third-party datasets, trained model weights, API keys, or the
+local user database. Dataset access remains subject to the terms of each upstream
+source.
 
 ## Main scripts
 
@@ -85,4 +86,3 @@ from multiple upstream workspaces. Roboflow served as aggregation, annotation,
 and export infrastructure. The authors do not claim ownership of all underlying
 images, and the images are not redistributed here. Trained weights are also
 excluded pending confirmation of the applicable source and model licenses.
-
