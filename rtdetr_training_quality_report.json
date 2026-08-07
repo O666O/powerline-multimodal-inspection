@@ -1,0 +1,119 @@
+{
+  "source_images": 18253,
+  "source_instances": 48671,
+  "usable_images": 18253,
+  "corrupt_or_invalid_pairs": 0,
+  "duplicate_boxes_removed": 0,
+  "files_with_duplicate_boxes": 0,
+  "target_effective_images_per_class": 1800,
+  "max_repeat": 3,
+  "balanced_epoch_images": 25340,
+  "repeat_histogram": {
+    "1": 13810,
+    "2": 1799,
+    "3": 2644
+  },
+  "classes": {
+    "0": {
+      "name": "Damper - Spiral",
+      "source_images": 679,
+      "source_instances": 745,
+      "repeat_factor": 3,
+      "effective_epoch_images": 2037
+    },
+    "1": {
+      "name": "Damper - Stockbridge",
+      "source_images": 1263,
+      "source_instances": 4936,
+      "repeat_factor": 2,
+      "effective_epoch_images": 2549
+    },
+    "2": {
+      "name": "Glass Insulator",
+      "source_images": 1808,
+      "source_instances": 2011,
+      "repeat_factor": 1,
+      "effective_epoch_images": 2318
+    },
+    "3": {
+      "name": "Lightning Rod Suspension",
+      "source_images": 429,
+      "source_instances": 430,
+      "repeat_factor": 3,
+      "effective_epoch_images": 1287
+    },
+    "4": {
+      "name": "Polymer Insulator",
+      "source_images": 2067,
+      "source_instances": 2178,
+      "repeat_factor": 1,
+      "effective_epoch_images": 2789
+    },
+    "5": {
+      "name": "Polymer Insulator Shackle",
+      "source_images": 2175,
+      "source_instances": 2216,
+      "repeat_factor": 1,
+      "effective_epoch_images": 3281
+    },
+    "6": {
+      "name": "Vari-Grip",
+      "source_images": 364,
+      "source_instances": 687,
+      "repeat_factor": 3,
+      "effective_epoch_images": 1092
+    },
+    "7": {
+      "name": "Yoke",
+      "source_images": 1770,
+      "source_instances": 5632,
+      "repeat_factor": 2,
+      "effective_epoch_images": 3545
+    },
+    "8": {
+      "name": "Bird Nest",
+      "source_images": 4957,
+      "source_instances": 6830,
+      "repeat_factor": 1,
+      "effective_epoch_images": 4957
+    },
+    "9": {
+      "name": "Plastic Bag",
+      "source_images": 2280,
+      "source_instances": 3205,
+      "repeat_factor": 1,
+      "effective_epoch_images": 2280
+    },
+    "10": {
+      "name": "Fluttering Object",
+      "source_images": 6557,
+      "source_instances": 10278,
+      "repeat_factor": 1,
+      "effective_epoch_images": 6557
+    },
+    "11": {
+      "name": "Balloon",
+      "source_images": 4161,
+      "source_instances": 8187,
+      "repeat_factor": 1,
+      "effective_epoch_images": 4161
+    },
+    "12": {
+      "name": "Broken Power Lines",
+      "source_images": 574,
+      "source_instances": 574,
+      "repeat_factor": 3,
+      "effective_epoch_images": 1722
+    },
+    "13": {
+      "name": "Broken Insulator",
+      "source_images": 762,
+      "source_instances": 762,
+      "repeat_factor": 3,
+      "effective_epoch_images": 2286
+    }
+  },
+  "invalid_examples": [],
+  "balanced_list": "train_quality_balanced.txt",
+  "data_yaml_train": "train_quality_balanced.txt"
+}

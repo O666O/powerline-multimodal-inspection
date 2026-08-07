@@ -1,0 +1,71 @@
+# Secrets and local user data
+.env
+.env.*
+!.env.example
+*.sqlite
+*.sqlite3
+*.db
+
+# Training, validation and test images/labels
+/train/
+/valid/
+/test/
+/chinese_clip_dataset/
+/external_data/
+/quarantine/
+/_quarantine/
+
+# Model weights and large binary datasets
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.engine
+*.safetensors
+*.bin
+*.parquet
+*.zip
+*.rar
+*.7z
+*.tar
+*.tar.gz
+*.tgz
+*.tsv
+
+# Generated runs, indexes, caches and local tools
+/runs/
+/tmp/
+/.tools/
+/Ultralytics/
+/.agents/
+/.codex/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+
+# Dataset-derived private manifests
+/polygon_annotations_backup.jsonl
+/split_optimization_manifest.jsonl
+/train_quality_balanced.txt
+
+# LaTeX build intermediates
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.synctex.gz
+
+# Unpublished manuscript and journal template
+/DeCarbon_LaTeX_Draft/
+/DeCarbon_LaTeX_Template/
+
+# Editor and operating-system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini

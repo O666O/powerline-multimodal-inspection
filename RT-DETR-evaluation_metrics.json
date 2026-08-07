@@ -1,0 +1,17 @@
+{
+  "best_weight": "/root/autodl-tmp/a.yolov8/runs/rtdetr/powerline_rtdetr_l_full/weights/best.pt",
+  "validation": {
+    "metrics/precision(B)": 0.7561528918693111,
+    "metrics/recall(B)": 0.7177662790618935,
+    "metrics/mAP50(B)": 0.7313702598439925,
+    "metrics/mAP50-95(B)": 0.5208248004529006,
+    "fitness": 0.5208248004529006
+  },
+  "test": {
+    "metrics/precision(B)": 0.844994961238848,
+    "metrics/recall(B)": 0.7052730521814069,
+    "metrics/mAP50(B)": 0.7268744704268543,
+    "metrics/mAP50-95(B)": 0.47857633526692833,
+    "fitness": 0.47857633526692833
+  }
+}

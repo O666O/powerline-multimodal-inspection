@@ -1,0 +1,25 @@
+train: train_quality_balanced.txt
+val: valid/images
+test: test/images
+nc: 14
+names:
+- Damper - Spiral
+- Damper - Stockbridge
+- Glass Insulator
+- Lightning Rod Suspension
+- Polymer Insulator
+- Polymer Insulator Shackle
+- Vari-Grip
+- Yoke
+- Bird Nest
+- Plastic Bag
+- Fluttering Object
+- Balloon
+- Broken Power Lines
+- Broken Insulator
+roboflow:
+  workspace: weizhes-workspace
+  project: power-pldef-c7aig
+  version: 1
+  license: Private
+  url: https://universe.roboflow.com/weizhes-workspace/power-pldef-c7aig/dataset/1

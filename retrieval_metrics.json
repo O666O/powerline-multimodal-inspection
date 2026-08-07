@@ -1,0 +1,115 @@
+{
+  "split": "test",
+  "metric_definition": {
+    "paper_compatible_summary": "图到文与文到图 Recall 的算术平均",
+    "instance_R@K": "前K项是否包含严格配对实例",
+    "label_R@K": "前K项是否包含相同类别",
+    "proto_label_R@K": "类别原型文本检索前K张图片是否命中该类别"
+  },
+  "baseline": {
+    "model": "/root/autodl-tmp/models/chinese-clip",
+    "samples": 5732,
+    "image_to_text": {
+      "instance_R@1": 0.00017445917655268666,
+      "instance_R@5": 0.0013956734124214933,
+      "label_R@1": 0.2545359385903698,
+      "label_R@5": 0.2545359385903698
+    },
+    "text_to_image": {
+      "instance_R@1": 0.00052337752965806,
+      "instance_R@5": 0.00314026517794836,
+      "label_R@1": 0.42725052337752967,
+      "label_R@5": 0.5418702023726448
+    },
+    "bidirectional_mean": {
+      "instance_R@1": 0.0003489183531053733,
+      "instance_R@5": 0.0022679692951849267,
+      "label_R@1": 0.34089323098394975,
+      "label_R@5": 0.3982030704815073
+    },
+    "paper_compatible_summary": {
+      "instance_R@1": 0.0003489183531053733,
+      "instance_R@5": 0.0022679692951849267,
+      "label_R@1": 0.34089323098394975,
+      "label_R@5": 0.3982030704815073,
+      "proto_label_R@1": 0.4545454680919647,
+      "proto_label_R@5": 0.5454545617103577
+    },
+    "supplementary_image_to_prototype": {
+      "top1_accuracy": 0.23866014182567596,
+      "top5_accuracy": 0.6311932802200317
+    }
+  },
+  "finetuned": {
+    "model": "/root/autodl-tmp/a.yolov8/runs/chinese_clip/best",
+    "samples": 5732,
+    "image_to_text": {
+      "instance_R@1": 0.00157013258897418,
+      "instance_R@5": 0.008025122121423587,
+      "label_R@1": 0.9642358688066992,
+      "label_R@5": 0.9642358688066992
+    },
+    "text_to_image": {
+      "instance_R@1": 0.0017445917655268667,
+      "instance_R@5": 0.009595254710397768,
+      "label_R@1": 0.7468597348220516,
+      "label_R@5": 1.0
+    },
+    "bidirectional_mean": {
+      "instance_R@1": 0.0016573621772505234,
+      "instance_R@5": 0.008810188415910677,
+      "label_R@1": 0.8555478018143754,
+      "label_R@5": 0.9821179344033496
+    },
+    "paper_compatible_summary": {
+      "instance_R@1": 0.0016573621772505234,
+      "instance_R@5": 0.008810188415910677,
+      "label_R@1": 0.8555478018143754,
+      "label_R@5": 0.9821179344033496,
+      "proto_label_R@1": 0.8181818723678589,
+      "proto_label_R@5": 1.0
+    },
+    "supplementary_image_to_prototype": {
+      "top1_accuracy": 0.9642358422279358,
+      "top5_accuracy": 0.9926726818084717
+    }
+  },
+  "comparison": {
+    "instance_R@1": {
+      "baseline": 0.0003489183531053733,
+      "finetuned": 0.0016573621772505234,
+      "absolute_gain": 0.00130844382414515,
+      "percentage_point_gain": 0.130844382414515
+    },
+    "instance_R@5": {
+      "baseline": 0.0022679692951849267,
+      "finetuned": 0.008810188415910677,
+      "absolute_gain": 0.006542219120725751,
+      "percentage_point_gain": 0.6542219120725751
+    },
+    "label_R@1": {
+      "baseline": 0.34089323098394975,
+      "finetuned": 0.8555478018143754,
+      "absolute_gain": 0.5146545708304257,
+      "percentage_point_gain": 51.465457083042566
+    },
+    "label_R@5": {
+      "baseline": 0.3982030704815073,
+      "finetuned": 0.9821179344033496,
+      "absolute_gain": 0.5839148639218423,
+      "percentage_point_gain": 58.391486392184234
+    },
+    "proto_label_R@1": {
+      "baseline": 0.4545454680919647,
+      "finetuned": 0.8181818723678589,
+      "absolute_gain": 0.36363640427589417,
+      "percentage_point_gain": 36.36364042758942
+    },
+    "proto_label_R@5": {
+      "baseline": 0.5454545617103577,
+      "finetuned": 1.0,
+      "absolute_gain": 0.45454543828964233,
+      "percentage_point_gain": 45.45454382896423
+    }
+  }
+}
