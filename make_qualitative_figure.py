@@ -58,6 +58,14 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--iou", type=float, default=0.5)
     parser.add_argument("--small-area", type=float, default=0.01)
+    parser.add_argument(
+        "--allowed-prefixes",
+        default="",
+        help=(
+            "Optional comma-separated filename prefixes. Use this to restrict "
+            "published examples to sources with verified reproduction rights."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -125,8 +133,15 @@ def analyze_images(args: argparse.Namespace, names: list[str]) -> list[dict]:
         (i for i, name in enumerate(names) if name.lower() == "broken power lines"),
         12,
     )
+    prefixes = tuple(
+        prefix.strip()
+        for prefix in args.allowed_prefixes.split(",")
+        if prefix.strip()
+    )
     records = []
     for image_path in sorted(p for p in image_dir.iterdir() if p.suffix.lower() in IMAGE_SUFFIXES):
+        if prefixes and not image_path.name.startswith(prefixes):
+            continue
         with Image.open(image_path) as image:
             width, height = image.size
         gt = load_boxes(gt_dir / f"{image_path.stem}.txt", width, height, False)
@@ -154,7 +169,9 @@ def analyze_images(args: argparse.Namespace, names: list[str]) -> list[dict]:
     return records
 
 
-def select_cases(records: list[dict], small_area: float) -> list[tuple[str, dict]]:
+def select_cases(
+    records: list[dict], small_area: float, source_restricted: bool = False
+) -> list[tuple[str, dict]]:
     def is_aigc(r):
         return "aigc" in r["image"].name.lower()
 
@@ -177,63 +194,140 @@ def select_cases(records: list[dict], small_area: float) -> list[tuple[str, dict
     def broken_fp_count(r):
         return sum(r["pred"][i].cls == r["broken_id"] for i in r["unmatched_pred"])
 
-    specifications = [
-        (
-            "Equipment success",
-            lambda r: no_errors(r)
-            and not is_aigc(r)
-            and 1 <= len(r["gt"]) <= 6
-            and any(box.cls < 8 for box in r["gt"]),
-            lambda r: (len(r["gt"]), sum(p.conf for p in r["pred"])),
-        ),
-        (
-            "Multi-object success",
-            lambda r: no_errors(r) and not is_aigc(r) and 3 <= len(r["gt"]) <= 8,
-            lambda r: (len(r["gt"]), sum(p.conf for p in r["pred"])),
-        ),
-        (
-            "Abnormal-object success",
-            lambda r: no_errors(r)
-            and not is_aigc(r)
-            and 1 <= len(r["gt"]) <= 6
-            and field_abnormal_count(r) > 0,
-            lambda r: (field_abnormal_count(r), sum(p.conf for p in r["pred"])),
-        ),
-        (
-            "Small-target success",
-            lambda r: no_errors(r)
-            and not is_aigc(r)
-            and len(r["gt"]) <= 8
-            and any(a <= small_area for a in r["areas"]),
-            lambda r: (-min(r["areas"]), len(r["gt"])),
-        ),
-        (
-            "Broken conductor: TP",
-            lambda r: broken_tp_count(r) > 0,
-            lambda r: (broken_tp_count(r), max((p.conf for p in r["pred"]), default=0.0)),
-        ),
-        (
-            "Broken conductor: FN",
-            lambda r: broken_fn_count(r) > 0,
-            lambda r: (broken_fn_count(r), len(r["gt"])),
-        ),
-        (
-            "Broken conductor: hard FP",
-            lambda r: not any(g.cls == r["broken_id"] for g in r["gt"]) and broken_fp_count(r) > 0,
-            lambda r: (
-                broken_fp_count(r),
-                max((r["pred"][i].conf for i in r["unmatched_pred"] if r["pred"][i].cls == r["broken_id"]), default=0.0),
+    def source_name(r):
+        return r["image"].name.lower()
+
+    def defect_tp_count(r):
+        return sum(r["gt"][gi].cls >= 12 for gi, _, _ in r["pairs"])
+
+    def defect_fn_count(r):
+        return sum(r["gt"][i].cls >= 12 for i in r["unmatched_gt"])
+
+    def defect_fp_count(r):
+        return sum(r["pred"][i].cls >= 12 for i in r["unmatched_pred"])
+
+    if source_restricted:
+        specifications = [
+            (
+                "Broken-insulator success",
+                lambda r: source_name(r).startswith("hfpclf_") and no_errors(r),
+                lambda r: (len(r["gt"]), sum(p.conf for p in r["pred"])),
             ),
-        ),
-        (
-            "Complex-scene failure",
-            lambda r: not is_aigc(r)
-            and 2 <= len(r["gt"]) <= 8
-            and len(r["pred"]) <= 10
-            and bool(r["unmatched_gt"] or r["unmatched_pred"]),
-            lambda r: (len(r["unmatched_gt"]) + len(r["unmatched_pred"]), len(r["gt"])),
-        ),
-    ]
+            (
+                "Foreign-object success",
+                lambda r: source_name(r).startswith("railfod23_")
+                and not is_aigc(r)
+                and no_errors(r),
+                lambda r: (field_abnormal_count(r), sum(p.conf for p in r["pred"])),
+            ),
+            (
+                "Small-target success",
+                lambda r: source_name(r).startswith("railfod23_")
+                and not is_aigc(r)
+                and no_errors(r)
+                and any(a <= small_area for a in r["areas"]),
+                lambda r: (-min(r["areas"]), len(r["gt"])),
+            ),
+            (
+                "Multi-object success",
+                lambda r: source_name(r).startswith("railfod23_")
+                and not is_aigc(r)
+                and no_errors(r)
+                and 2 <= len(r["gt"]) <= 8,
+                lambda r: (len(r["gt"]), sum(p.conf for p in r["pred"])),
+            ),
+            (
+                "Physical-defect true positive",
+                lambda r: source_name(r).startswith("hfpclf_")
+                and defect_tp_count(r) > 0,
+                lambda r: (defect_tp_count(r), max((p.conf for p in r["pred"]), default=0.0)),
+            ),
+            (
+                "Physical-defect miss",
+                lambda r: source_name(r).startswith("hfpclf_")
+                and defect_fn_count(r) > 0,
+                lambda r: (defect_fn_count(r), len(r["gt"])),
+            ),
+            (
+                "Physical-defect false positive",
+                lambda r: source_name(r).startswith("hfpclf_")
+                and defect_fp_count(r) > 0,
+                lambda r: (defect_fp_count(r), len(r["pred"])),
+            ),
+            (
+                "Licensed-source complex failure",
+                lambda r: not is_aigc(r)
+                and 1 <= len(r["gt"]) <= 8
+                and bool(r["unmatched_gt"] or r["unmatched_pred"]),
+                lambda r: (len(r["unmatched_gt"]) + len(r["unmatched_pred"]), len(r["gt"])),
+            ),
+        ]
+    else:
+        specifications = [
+            (
+                "Equipment success",
+                lambda r: no_errors(r)
+                and not is_aigc(r)
+                and 1 <= len(r["gt"]) <= 6
+                and any(box.cls < 8 for box in r["gt"]),
+                lambda r: (len(r["gt"]), sum(p.conf for p in r["pred"])),
+            ),
+            (
+                "Multi-object success",
+                lambda r: no_errors(r) and not is_aigc(r) and 3 <= len(r["gt"]) <= 8,
+                lambda r: (len(r["gt"]), sum(p.conf for p in r["pred"])),
+            ),
+            (
+                "Abnormal-object success",
+                lambda r: no_errors(r)
+                and not is_aigc(r)
+                and 1 <= len(r["gt"]) <= 6
+                and field_abnormal_count(r) > 0,
+                lambda r: (field_abnormal_count(r), sum(p.conf for p in r["pred"])),
+            ),
+            (
+                "Small-target success",
+                lambda r: no_errors(r)
+                and not is_aigc(r)
+                and len(r["gt"]) <= 8
+                and any(a <= small_area for a in r["areas"]),
+                lambda r: (-min(r["areas"]), len(r["gt"])),
+            ),
+            (
+                "Broken conductor: TP",
+                lambda r: broken_tp_count(r) > 0,
+                lambda r: (broken_tp_count(r), max((p.conf for p in r["pred"]), default=0.0)),
+            ),
+            (
+                "Broken conductor: FN",
+                lambda r: broken_fn_count(r) > 0,
+                lambda r: (broken_fn_count(r), len(r["gt"])),
+            ),
+            (
+                "Broken conductor: hard FP",
+                lambda r: not any(g.cls == r["broken_id"] for g in r["gt"])
+                and broken_fp_count(r) > 0,
+                lambda r: (
+                    broken_fp_count(r),
+                    max(
+                        (
+                            r["pred"][i].conf
+                            for i in r["unmatched_pred"]
+                            if r["pred"][i].cls == r["broken_id"]
+                        ),
+                        default=0.0,
+                    ),
+                ),
+            ),
+            (
+                "Complex-scene failure",
+                lambda r: not is_aigc(r)
+                and 2 <= len(r["gt"]) <= 8
+                and len(r["pred"]) <= 10
+                and bool(r["unmatched_gt"] or r["unmatched_pred"]),
+                lambda r: (len(r["unmatched_gt"]) + len(r["unmatched_pred"]), len(r["gt"])),
+            ),
+        ]
 
     selected: list[tuple[str, dict]] = []
     used: set[Path] = set()
@@ -245,7 +339,13 @@ def select_cases(records: list[dict], small_area: float) -> list[tuple[str, dict
             used.add(chosen["image"])
 
     fallbacks = sorted(
-        (r for r in records if r["image"] not in used and r["gt"]),
+        (
+            r
+            for r in records
+            if r["image"] not in used
+            and r["gt"]
+            and (not source_restricted or (not is_aigc(r) and len(r["gt"]) <= 8))
+        ),
         key=lambda r: (
             bool(r["unmatched_gt"] or r["unmatched_pred"]),
             len(r["gt"]),
@@ -349,7 +449,7 @@ def main() -> None:
         )
     names = load_names(Path(args.data))
     records = analyze_images(args, names)
-    selected = select_cases(records, args.small_area)
+    selected = select_cases(records, args.small_area, bool(args.allowed_prefixes.strip()))
     output = Path(args.output)
     create_figure(selected, names, output)
     print(f"Analyzed {len(records)} held-out test images.")

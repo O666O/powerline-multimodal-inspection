@@ -90,8 +90,9 @@ python -u use_model.py
 
 ## Data and model availability
 
-The base corpus was consolidated in an author-managed private Roboflow project
-from multiple upstream workspaces. Roboflow served as aggregation, annotation,
-and export infrastructure. The authors do not claim ownership of all underlying
-images, and the images are not redistributed here. Trained weights are also
-excluded pending confirmation of the applicable source and model licenses.
+The base corpus is derived from the InsPLAD object-detection release and was
+processed through an author-managed Roboflow project for class filtering,
+remapping, annotation correction, and export. InsPLAD is licensed under
+CC BY-NC-SA 4.0. Supplementary images retain their original source-specific
+terms. Images and annotations are not redistributed here; readers should obtain
+them from the cited upstream records. Trained weights are also excluded.
