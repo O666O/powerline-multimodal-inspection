@@ -1,0 +1,8 @@
+module,runs,mean_ms,std_ms,median_ms,p95_ms,fps
+Chinese-CLIP text encoding,100,4.984,0.667,4.862,4.98,200.631
+FAISS image search,100,0.6,0.091,0.598,0.702,1667.761
+Text-to-image retrieval,100,5.503,0.641,5.305,7.41,181.722
+Chinese-CLIP image encoding,100,5.779,0.237,5.764,5.816,173.033
+FAISS text search,100,0.403,0.015,0.401,0.428,2478.791
+Image-to-text retrieval,100,6.219,0.22,6.113,6.568,160.795
+YOLOv8 detection (960px),100,11.212,0.22,11.158,11.4,89.19

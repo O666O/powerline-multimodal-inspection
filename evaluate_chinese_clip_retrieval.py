@@ -51,6 +51,12 @@ def parse_args():
     parser.add_argument("--similarity-batch-size", type=int, default=512)
     parser.add_argument("--device", default="auto")
     parser.add_argument("--output", type=Path, default=ROOT / "retrieval_metrics.json")
+    parser.add_argument(
+        "--baseline-cache",
+        type=Path,
+        default=None,
+        help="可选：缓存原版模型检索结果，供多个消融配置复用",
+    )
     return parser.parse_args()
 
 
@@ -420,17 +426,50 @@ def main():
         flush=True,
     )
 
-    baseline = evaluate_model(
-        args.baseline_model,
-        processor,
-        records,
-        args.data_dir,
-        class_names,
-        device,
-        args.batch_size,
-        args.similarity_batch_size,
-        "原版模型",
-    )
+    baseline = None
+    if args.baseline_cache and args.baseline_cache.is_file():
+        cached = json.loads(args.baseline_cache.read_text(encoding="utf-8"))
+        expected = {
+            "split": args.split,
+            "model": str(args.baseline_model),
+            "samples": len(records),
+        }
+        actual = {key: cached.get(key) for key in expected}
+        if actual != expected:
+            raise ValueError(
+                f"基线缓存与当前评测不匹配：expected={expected}, actual={actual}"
+            )
+        baseline = cached["result"]
+        print(f"复用原版模型检索缓存：{args.baseline_cache}", flush=True)
+    if baseline is None:
+        baseline = evaluate_model(
+            args.baseline_model,
+            processor,
+            records,
+            args.data_dir,
+            class_names,
+            device,
+            args.batch_size,
+            args.similarity_batch_size,
+            "原版模型",
+        )
+        if args.baseline_cache:
+            args.baseline_cache.parent.mkdir(parents=True, exist_ok=True)
+            args.baseline_cache.write_text(
+                json.dumps(
+                    {
+                        "split": args.split,
+                        "model": str(args.baseline_model),
+                        "samples": len(records),
+                        "result": baseline,
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            print(f"原版模型检索缓存已保存：{args.baseline_cache}", flush=True)
     finetuned = evaluate_model(
         args.finetuned_model,
         processor,

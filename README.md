@@ -4,7 +4,7 @@ Research code for a power-transmission inspection prototype combining:
 
 - Chinese-CLIP equipment classification and bidirectional image-text retrieval;
 - FAISS vector search;
-- YOLOv8-L and RT-DETR-L object-detection experiments;
+- YOLOv8-L, YOLO26-L and RT-DETR-L object-detection experiments;
 - a Gradio-based inspection interface with optional structured report generation.
 
 ## Repository scope
@@ -19,7 +19,10 @@ source.
 
 - `train_chinese_clip.py`: fine-tune and evaluate Chinese-CLIP.
 - `evaluate_chinese_clip_retrieval.py`: compare pretrained and fine-tuned retrieval.
-- `run_detection_baselines.py`: train/evaluate YOLOv8-L and RT-DETR-L baselines.
+- `run_chinese_clip_ablations.py`: run the controlled encoder/template ablations.
+- `run_detection_baselines.py`: train/evaluate the three detector families.
+- `run_detection_three_seeds.py`: repeat every detector with three fixed seeds.
+- `run_mpcd_749_ablation.py`: isolate the 749 external conductor images.
 - `train_rtdetr.py`: RT-DETR training entry point.
 - `benchmark_system_latency.py`: measure local retrieval and detection latency.
 - `use_model.py`: launch the integrated Gradio prototype.
@@ -68,6 +71,12 @@ System latency:
 ```bash
 python benchmark_system_latency.py --warmup 20 --repeats 100 --image-pool 50 --imgsz 960
 ```
+
+The commands for controlled ablations and multi-seed experiments are documented
+in `CHINESE_CLIP_ABLATIONS.md`, `THREE_SEED_EXPERIMENTS.md`, and
+`MPCD_749_ABLATION.md`. De-identified aggregate outputs used by the manuscript
+are stored under `results/`; they do not contain images, annotations, weights,
+user records, credentials, or machine-specific checkpoint paths.
 
 ## Launch the prototype
 

@@ -22,19 +22,23 @@ ROOT = Path(__file__).resolve().parent
 EXPERIMENTS = {
     "rtdetr": {"family": "rtdetr", "weight": "rtdetr-l.pt", "name": "baseline_rtdetr_l"},
     "yolov8": {"family": "yolo", "weight": "yolov8l.pt", "name": "baseline_yolov8_l"},
+    "yolo26": {"family": "yolo", "weight": "yolo26l.pt", "name": "baseline_yolo26_l"},
 }
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Train RT-DETR/YOLO baselines and evaluate them on one fixed test set."
+        description=(
+            "Train RT-DETR-L, YOLOv8-L and YOLO26-L with one fixed protocol, "
+            "then evaluate them on the same validation and test splits."
+        )
     )
     parser.add_argument("--data", type=Path, default=ROOT / "data.yaml")
     parser.add_argument(
         "--experiments",
         nargs="+",
         choices=sorted(EXPERIMENTS),
-        default=["rtdetr", "yolov8"],
+        default=["rtdetr", "yolov8", "yolo26"],
         help="Baselines to run sequentially.",
     )
     parser.add_argument(
@@ -44,6 +48,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--rtdetr-weight", default="rtdetr-l.pt")
     parser.add_argument("--yolo-weight", default="yolov8l.pt")
+    parser.add_argument("--yolo26-weight", default="yolo26l.pt")
     parser.add_argument("--epochs", type=int, default=60)
     parser.add_argument("--imgsz", type=int, default=960)
     parser.add_argument("--batch", type=int, default=8)
@@ -54,6 +59,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--lr0", type=float, default=1e-4)
     parser.add_argument("--weight-decay", type=float, default=1e-4)
     parser.add_argument("--warmup-epochs", type=float, default=5.0)
+    parser.add_argument("--conf", type=float, default=0.001)
+    parser.add_argument("--iou", type=float, default=0.7)
+    parser.add_argument("--max-det", type=int, default=300)
     parser.add_argument(
         "--amp",
         action=argparse.BooleanOptionalAction,
@@ -62,6 +70,15 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--project", type=Path, default=ROOT / "runs" / "baselines")
     parser.add_argument("--overwrite", action="store_true")
+    parser.add_argument(
+        "--merge-existing",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help=(
+            "When running only YOLO26-L, retain compatible RT-DETR-L/YOLOv8-L "
+            "rows already stored in baseline_metrics.json."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -103,7 +120,15 @@ def load_model(family: str, weight: str):
         from ultralytics import RTDETR, YOLO
     except ImportError as exc:
         raise SystemExit("Please install dependencies: pip install -U ultralytics pyyaml") from exc
-    return RTDETR(weight) if family == "rtdetr" else YOLO(weight)
+    try:
+        return RTDETR(weight) if family == "rtdetr" else YOLO(weight)
+    except Exception as exc:
+        if Path(weight).name.lower().startswith("yolo26"):
+            raise RuntimeError(
+                "Unable to load YOLO26-L. Run `pip install -U ultralytics` "
+                "and verify that yolo26l.pt is a complete checkpoint."
+            ) from exc
+        raise
 
 
 def to_float_list(value: Any) -> list[float]:
@@ -171,6 +196,9 @@ def evaluate(model: Any, args: argparse.Namespace, data_yaml: Path, split: str) 
         batch=args.batch,
         device=args.device,
         workers=args.workers,
+        conf=args.conf,
+        iou=args.iou,
+        max_det=args.max_det,
         plots=True,
     )
     return serialize_metrics(metrics, model, split)
@@ -182,6 +210,8 @@ def train_one(key: str, args: argparse.Namespace, data_yaml: Path) -> dict[str, 
         spec["weight"] = args.rtdetr_weight
     elif key == "yolov8":
         spec["weight"] = args.yolo_weight
+    elif key == "yolo26":
+        spec["weight"] = args.yolo26_weight
 
     run_dir = args.project.resolve() / spec["name"]
     best_weight = run_dir / "weights" / "best.pt"
@@ -272,6 +302,66 @@ def write_summary_csv(reports: list[dict[str, Any]], output: Path) -> None:
             )
 
 
+def write_per_class_csv(reports: list[dict[str, Any]], output: Path) -> None:
+    """Write class-wise held-out test metrics for paper/error analysis."""
+    fields = [
+        "experiment",
+        "class_id",
+        "class_name",
+        "precision",
+        "recall",
+        "mAP50",
+        "mAP50-95",
+    ]
+    with output.open("w", newline="", encoding="utf-8-sig") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields)
+        writer.writeheader()
+        for report in reports:
+            for row in report["test"]["per_class"]:
+                writer.writerow({"experiment": report["experiment"], **row})
+
+
+def merge_compatible_existing_reports(
+    report_path: Path,
+    new_reports: list[dict[str, Any]],
+    protocol: dict[str, Any],
+    enabled: bool,
+) -> list[dict[str, Any]]:
+    """Preserve earlier comparison rows only when the core protocol matches."""
+    if not enabled or not report_path.is_file():
+        return new_reports
+    try:
+        previous = json.loads(report_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        print(f"[warning] Existing report was not merged: {exc}")
+        return new_reports
+
+    previous_protocol = previous.get("protocol", {})
+    compatibility_keys = ("epochs", "imgsz", "batch", "seed")
+    mismatches = [
+        key
+        for key in compatibility_keys
+        if previous_protocol.get(key) != protocol.get(key)
+    ]
+    if mismatches:
+        print(
+            "[warning] Existing reports were not merged because these protocol "
+            f"fields differ: {', '.join(mismatches)}"
+        )
+        return new_reports
+
+    merged = {
+        str(report["experiment"]): report
+        for report in previous.get("experiments", [])
+        if isinstance(report, dict) and "experiment" in report
+    }
+    merged.update({str(report["experiment"]): report for report in new_reports})
+    preferred_order = list(EXPERIMENTS)
+    return [merged[key] for key in preferred_order if key in merged] + [
+        report for key, report in merged.items() if key not in preferred_order
+    ]
+
+
 def main() -> None:
     args = parse_args()
     if not args.data.is_file():
@@ -293,19 +383,30 @@ def main() -> None:
     print(f"Validation source: {resolved_data['val']}")
     print(f"Test source: {resolved_data['test']}")
 
-    reports = [train_one(key, args, baseline_yaml.resolve()) for key in args.experiments]
     report_path = args.project / "baseline_metrics.json"
+    protocol = {
+        "data_yaml": str(baseline_yaml.resolve()),
+        "epochs": args.epochs,
+        "imgsz": args.imgsz,
+        "batch": args.batch,
+        "seed": args.seed,
+        "amp": args.amp,
+        "optimizer": "AdamW",
+        "lr0": args.lr0,
+        "weight_decay": args.weight_decay,
+        "warmup_epochs": args.warmup_epochs,
+        "conf": args.conf,
+        "iou": args.iou,
+        "max_det": args.max_det,
+    }
+    new_reports = [train_one(key, args, baseline_yaml.resolve()) for key in args.experiments]
+    reports = merge_compatible_existing_reports(
+        report_path, new_reports, protocol, args.merge_existing
+    )
     report_path.write_text(
         json.dumps(
             {
-                "protocol": {
-                    "data_yaml": str(baseline_yaml.resolve()),
-                    "epochs": args.epochs,
-                    "imgsz": args.imgsz,
-                    "batch": args.batch,
-                    "seed": args.seed,
-                    "amp": args.amp,
-                },
+                "protocol": protocol,
                 "experiments": reports,
             },
             ensure_ascii=False,
@@ -316,8 +417,11 @@ def main() -> None:
     )
     csv_path = args.project / "baseline_summary.csv"
     write_summary_csv(reports, csv_path)
+    per_class_csv_path = args.project / "baseline_per_class_test.csv"
+    write_per_class_csv(reports, per_class_csv_path)
     print(f"\nJSON report: {report_path}")
     print(f"CSV summary: {csv_path}")
+    print(f"Per-class test CSV: {per_class_csv_path}")
 
 
 if __name__ == "__main__":

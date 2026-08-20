@@ -32,6 +32,26 @@ def parse_args():
     parser.add_argument("--max-text-length", type=int, default=52)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--device", default="auto")
+    parser.add_argument(
+        "--train-mode",
+        choices=("full", "vision_only", "text_only"),
+        default="full",
+        help=(
+            "微调范围：full=双塔全部微调，vision_only=仅图像塔，"
+            "text_only=仅文本塔"
+        ),
+    )
+    parser.add_argument(
+        "--caption-mode",
+        choices=("original", "single"),
+        default="original",
+        help="训练文本使用原始多模板，或统一替换为单模板",
+    )
+    parser.add_argument(
+        "--single-caption-template",
+        default="输电线路上的{label}",
+        help="caption-mode=single 时使用，必须包含 {label}",
+    )
     parser.add_argument("--freeze-vision", action="store_true")
     parser.add_argument("--freeze-text", action="store_true")
     parser.add_argument(
@@ -62,11 +82,20 @@ def set_seed(seed):
         np.random.seed(seed)
     except ImportError:
         pass
+    try:
+        import torch
+
+        torch.manual_seed(seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(seed)
+    except ImportError:
+        pass
 
 
 class PairDataset:
-    def __init__(self, manifest, data_dir):
+    def __init__(self, manifest, data_dir, caption_template=None):
         self.data_dir = data_dir
+        self.caption_template = caption_template
         with manifest.open("r", encoding="utf-8") as file:
             self.records = [json.loads(line) for line in file if line.strip()]
 
@@ -80,7 +109,43 @@ class PairDataset:
         image_path = self.data_dir / record["image"]
         with Image.open(image_path) as image:
             image = image.convert("RGB")
-        return image, record["text"], int(record["class_id"])
+        text = record["text"]
+        if self.caption_template is not None:
+            text = self.caption_template.format(label=record["class_name"])
+        return image, text, int(record["class_id"])
+
+
+def configure_trainable_parameters(model, train_mode, freeze_vision, freeze_text):
+    """严格控制两个编码塔及其投影层，避免消融实验发生参数泄漏。"""
+
+    for parameter in model.parameters():
+        parameter.requires_grad = train_mode == "full"
+
+    if train_mode == "vision_only":
+        for module in (model.vision_model, model.visual_projection):
+            for parameter in module.parameters():
+                parameter.requires_grad = True
+        model.logit_scale.requires_grad = True
+    elif train_mode == "text_only":
+        for module in (model.text_model, model.text_projection):
+            for parameter in module.parameters():
+                parameter.requires_grad = True
+        model.logit_scale.requires_grad = True
+
+    if freeze_vision:
+        for module in (model.vision_model, model.visual_projection):
+            for parameter in module.parameters():
+                parameter.requires_grad = False
+    if freeze_text:
+        for module in (model.text_model, model.text_projection):
+            for parameter in module.parameters():
+                parameter.requires_grad = False
+
+    trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    total = sum(p.numel() for p in model.parameters())
+    if trainable == 0:
+        raise ValueError("当前冻结设置导致没有可训练参数")
+    return trainable, total
 
 
 def multi_positive_contrastive_loss(output, class_ids):
@@ -292,6 +357,8 @@ def evaluate_classification(
 
 def main():
     args = parse_args()
+    if args.caption_mode == "single" and "{label}" not in args.single_caption_template:
+        raise ValueError("--single-caption-template 必须包含 {label}")
     set_seed(args.seed)
 
     try:
@@ -341,12 +408,23 @@ def main():
     model.to(device)
     print("预训练模型加载完成", flush=True)
 
-    if args.freeze_vision:
-        for parameter in model.vision_model.parameters():
-            parameter.requires_grad = False
-    if args.freeze_text:
-        for parameter in model.text_model.parameters():
-            parameter.requires_grad = False
+    if not args.eval_only:
+        trainable_count, total_count = configure_trainable_parameters(
+            model,
+            args.train_mode,
+            args.freeze_vision,
+            args.freeze_text,
+        )
+        print(
+            f"微调配置：train_mode={args.train_mode}, "
+            f"caption_mode={args.caption_mode}, seed={args.seed}",
+            flush=True,
+        )
+        print(
+            f"可训练参数：{trainable_count:,}/{total_count:,} "
+            f"({trainable_count / total_count:.2%})",
+            flush=True,
+        )
 
     def collate_fn(samples):
         images, texts, class_ids = zip(*samples)
@@ -404,7 +482,14 @@ def main():
         return
 
     generator = torch.Generator().manual_seed(args.seed)
-    train_dataset = PairDataset(train_manifest, args.data_dir)
+    train_caption_template = (
+        args.single_caption_template if args.caption_mode == "single" else None
+    )
+    train_dataset = PairDataset(
+        train_manifest,
+        args.data_dir,
+        caption_template=train_caption_template,
+    )
     sampler = None
     if args.balanced_sampling:
         class_counts = Counter(
@@ -567,6 +652,18 @@ def main():
         args.max_text_length,
     )
     report = {
+        "experiment": {
+            "train_mode": args.train_mode,
+            "caption_mode": args.caption_mode,
+            "single_caption_template": (
+                args.single_caption_template
+                if args.caption_mode == "single"
+                else None
+            ),
+            "seed": args.seed,
+            "trainable_parameters": trainable_count,
+            "total_parameters": total_count,
+        },
         "best_validation_loss": best_valid_loss,
         "test_contrastive_loss": test_loss,
         "test_classification": classification,

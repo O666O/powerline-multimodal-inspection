@@ -39,6 +39,10 @@
 /Ultralytics/
 /.agents/
 /.codex/
+/.codex_ppt_build/
+/.codex_ppt_font_build/
+/.codex_ppt_real_build/
+/figure_assets/
 __pycache__/
 *.py[cod]
 .pytest_cache/
